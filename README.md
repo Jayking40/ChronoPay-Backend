@@ -1,11 +1,11 @@
 # chronopay-backend
 
-API backend for **ChronoPay** — time tokenization and scheduling marketplace on Stellar.
+API backend for **ChronoPay** - time tokenization and scheduling marketplace on Stellar.
 
 ## What's in this repo
 
 - **Express** API with TypeScript
-- Health and stub API routes (e.g. `/api/v1/slots`)
+- Health, slot, and booking-intent routes
 - Ready for Stellar Horizon integration, token service, and scheduling logic
 
 ## Prerequisites
@@ -38,7 +38,7 @@ npm run start
 
 ## Environment validation
 
-ChronoPay now validates environment variables centrally at startup through `src/config/env.ts`.
+ChronoPay validates environment variables centrally at startup through `src/config/env.ts`.
 
 Currently validated variables used by `src`:
 
@@ -53,7 +53,7 @@ Currently validated variables used by `src`:
 
 ### Startup failure behavior
 
-If configuration is invalid, the app fails fast before serving requests. Errors are aggregated and sanitized so they identify the variable names and reasons without echoing raw values.
+If configuration is invalid, the app fails fast before serving requests. Errors are aggregated and sanitized so they identify variable names and reasons without echoing raw values.
 
 Example:
 
@@ -76,17 +76,84 @@ Additional reviewer-focused notes live in:
 
 ## Scripts
 
-| Script   | Description                    |
-|----------|--------------------------------|
+| Script | Description |
+|---|---|
 | `npm run build` | Compile TypeScript to `dist/` |
-| `npm run start` | Run production server         |
-| `npm run dev`   | Run dev server with tsx watch  |
-| `npm test`      | Run Jest tests                 |
+| `npm run start` | Run production server |
+| `npm run dev` | Run dev server with tsx watch |
+| `npm test` | Run Jest tests |
 
-## API (stub)
+## API
 
-- `GET /health` — Health check; returns `{ status: "ok", service: "chronopay-backend" }`
-- `GET /api/v1/slots` — List time slots (currently returns empty array)
+- `GET /health` - Health check; returns `{ status: "ok", service: "chronopay-backend" }`
+- `GET /api/v1/slots` - List the in-memory slot catalog
+- `POST /api/v1/slots` - Create a stub slot record
+- `POST /api/v1/booking-intents` - Create a booking intent for a bookable slot
+
+## Booking Intent API
+
+ChronoPay now includes a focused Booking Intent API that prepares a pending booking intent from a server-side slot catalog.
+
+### Endpoint
+
+- `POST /api/v1/booking-intents`
+
+### Auth headers
+
+- `x-chronopay-user-id` required
+- `x-chronopay-role` optional, defaults to `customer`
+
+Allowed roles:
+
+- `customer`
+- `admin`
+
+### Request body
+
+```json
+{
+  "slotId": "slot-100",
+  "note": "Optional booking note"
+}
+```
+
+### Response
+
+Successful creation returns `201` with:
+
+```json
+{
+  "success": true,
+  "bookingIntent": {
+    "id": "intent-1",
+    "slotId": "slot-100",
+    "professional": "alice",
+    "customerId": "customer-1",
+    "startTime": 1900000000000,
+    "endTime": 1900000360000,
+    "status": "pending",
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  }
+}
+```
+
+### Validation and failure behavior
+
+- `slotId` is required and must match the expected identifier format
+- `note` is optional but cannot be blank and must be at most 500 characters
+- the authenticated customer identity is derived from headers, not the request body
+- errors are explicit and sanitized:
+  - `400` invalid input
+  - `401` missing auth context
+  - `403` unauthorized role or self-booking
+  - `404` slot not found
+  - `409` unbookable, duplicate, or conflicting slot state
+  - `500` internal failure with a safe generic message
+
+Detailed reviewer notes live in:
+
+- `docs/booking-intent-api.md`
+- `docs/environment-validation.md`
 
 ## Contributing
 
