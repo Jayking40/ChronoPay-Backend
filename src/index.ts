@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import { listSlots } from "./services/slotService.js";
+import { validateRequiredFields } from "./middleware/validation.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
