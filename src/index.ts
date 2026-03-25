@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import swaggerUi from "swagger-ui-express";
+import swaggerJsdoc from "swagger-jsdoc";
 import { validateRequiredFields } from "./middleware/validation.js";
 import checkoutRouter from "./routes/checkout.js";
 
@@ -8,9 +10,6 @@ const PORT = process.env.PORT ?? 3001;
 
 app.use(cors());
 app.use(express.json());
-
-import swaggerUi from "swagger-ui-express";
-import swaggerJsdoc from "swagger-jsdoc";
 
 const options = {
   swaggerDefinition: {
