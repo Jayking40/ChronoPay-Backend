@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import { validateRequiredFields } from "./middleware/validation";
+import { validateRequiredFields } from "./middleware/validation.js";
+import { auditMiddleware } from "./middleware/audit.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -32,6 +33,7 @@ app.get("/api/v1/slots", (_req, res) => {
 
 app.post(
   "/api/v1/slots",
+  auditMiddleware("CREATE_SLOT"),
   validateRequiredFields(["professional", "startTime", "endTime"]),
   (req, res) => {
     const { professional, startTime, endTime } = req.body;
