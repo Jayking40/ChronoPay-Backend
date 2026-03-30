@@ -1,7 +1,11 @@
 import express from "express";
 import cors from "cors";
-import swaggerUi from "swagger-ui-express";
-import swaggerJsdoc from "swagger-jsdoc";
+import { logInfo } from "./utils/logger.js";
+import {
+  createRequestLogger,
+  errorLoggerMiddleware,
+} from "./middleware/requestLogger.js";
+import { validateRequiredFields } from "./middleware/validation";
 
 import { loadEnvConfig, type EnvConfig } from "./config/env.js";
 import {
@@ -17,7 +21,27 @@ import {
 import { InMemoryBookingIntentRepository } from "./modules/booking-intents/booking-intent-repository.js";
 import { InMemorySlotRepository } from "./modules/slots/slot-repository.js";
 
-const config = loadEnvConfig();
+// Request logging middleware (must be first)
+app.use(createRequestLogger());
+
+app.use(cors());
+app.use(express.json());
+app.use(metricsMiddleware);
+
+/**
+ * @api {get} /metrics Get Prometheus metrics
+ * @apiName GetMetrics
+ * @apiGroup Monitoring
+ * @apiDescription Exposes application metrics in Prometheus format.
+ */
+app.get("/metrics", async (_req, res) => {
+  try {
+    res.set("Content-Type", register.contentType);
+    res.end(await register.metrics());
+  } catch (err) {
+    res.status(500).end(err);
+  }
+});
 
 interface AppListener {
   listen(port: number, callback?: () => void): unknown;
@@ -73,43 +97,54 @@ export function createApp(options?: {
     },
   );
 
-  app.post(
-    "/api/v1/booking-intents",
-    requireAuthenticatedActor(["customer", "admin"]),
-    (req, res) => {
-      try {
-        const payload = parseCreateBookingIntentBody(req.body);
-        const bookingIntent = bookingIntentService.createIntent(
-          payload,
-          (req as AuthenticatedRequest).auth!,
-        );
+const options = {
+  swaggerDefinition: {
+    openapi: "3.0.0",
+    info: { title: "ChronoPay API", version: "1.0.0" },
+  },
+  apis: ["./src/routes/*.ts"], // adjust if needed
+};
 
-        res.status(201).json({
-          success: true,
-          bookingIntent,
-        });
-      } catch (error) {
-        if (error instanceof BookingIntentError) {
-          return res.status(error.status).json({
-            success: false,
-            error: error.message,
-          });
-        }
+const specs = swaggerJsdoc(options);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
-        return res.status(500).json({
-          success: false,
-          error: "Unable to create booking intent.",
-        });
-      }
-    },
-  );
+app.get("/health", (_req, res) => {
+  const healthStatus = { status: "ok", service: "chronopay-backend" };
+  logInfo("Health check endpoint called", { endpoint: "/health" });
+  res.json(healthStatus);
+});
 
-  return app;
-}
+app.get("/api/v1/slots", (_req, res) => {
+  logInfo("Slots endpoint called", { endpoint: "/api/v1/slots" });
+  res.json({ slots: [] });
+});
 
-export function startServer(app: AppListener, runtimeConfig: EnvConfig) {
-  return app.listen(runtimeConfig.port, () => {
-    console.log(`ChronoPay API listening on http://localhost:${runtimeConfig.port}`);
+// Error handling middleware (must be last)
+app.use(errorLoggerMiddleware);
+app.post(
+  "/api/v1/slots",
+  validateRequiredFields(["professional", "startTime", "endTime"]),
+  (req, res) => {
+    const { professional, startTime, endTime } = req.body;
+
+    res.status(201).json({
+      success: true,
+      slot: {
+        id: 1,
+        professional,
+        startTime,
+        endTime,
+      },
+    });
+  },
+);
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    logInfo(`ChronoPay API listening on http://localhost:${PORT}`, {
+      port: PORT,
+      environment: process.env.NODE_ENV || "development",
+    });
   });
 }
 
