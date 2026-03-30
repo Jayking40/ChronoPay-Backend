@@ -1,140 +1,69 @@
-export interface Slot {
-  id: number;
-  professional: string;
-  startTime: number;
-  endTime: number;
-  createdAt: string;
-  updatedAt: string;
+import { PaginatedSlots, Slot } from "../types.js";
+import { getSlotsCount, getSlotsPage } from "../repositories/slotRepository.js";
+
+const MAX_LIMIT = 100;
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
 }
 
-export interface CreateSlotInput {
-  professional: string;
-  startTime: number;
-  endTime: number;
+export interface SlotRepositoryInterface {
+  getSlotsCount: () => Promise<number>;
+  getSlotsPage: (offset: number, limit: number) => Promise<Slot[]>;
 }
 
-export interface UpdateSlotInput {
-  professional?: string;
-  startTime?: number;
-  endTime?: number;
+function sanitizeSlot(slot: Slot): Slot {
+  const { _internalNote, ...publicSlot } = slot;
+  return publicSlot;
 }
 
-export class SlotValidationError extends Error {
-  readonly statusCode = 400;
-}
+export const listSlots = async (
+  options: PaginationOptions,
+  repository: SlotRepositoryInterface = { getSlotsCount, getSlotsPage }
+): Promise<PaginatedSlots> => {
+  const page = options.page ?? DEFAULT_PAGE;
+  const limit = options.limit ?? DEFAULT_LIMIT;
 
-export class SlotNotFoundError extends Error {
-  readonly statusCode = 404;
-}
-
-export class SlotService {
-  private slots = new Map<number, Slot>();
-  private nextId = 1;
-  private readonly now: () => Date;
-
-  constructor(now: () => Date = () => new Date()) {
-    this.now = now;
+  if (!Number.isInteger(page) || page < 1) {
+    throw new Error("Invalid page");
   }
 
-  listSlots(): Slot[] {
-    return Array.from(this.slots.values())
-      .sort((a, b) => a.id - b.id)
-      .map((slot) => ({ ...slot }));
+  if (!Number.isInteger(limit) || limit < 1) {
+    throw new Error("Invalid limit");
   }
 
-  createSlot(input: CreateSlotInput): Slot {
-    const professional = this.validateProfessional(input.professional);
-    const { startTime, endTime } = this.validateRange(input.startTime, input.endTime);
-    const timestamp = this.now().toISOString();
+  if (limit > MAX_LIMIT) {
+    throw new Error("Limit exceeds maximum allowed value");
+  }
 
-    const slot: Slot = {
-      id: this.nextId,
-      professional,
-      startTime,
-      endTime,
-      createdAt: timestamp,
-      updatedAt: timestamp,
+  const total = await repository.getSlotsCount();
+  const offset = (page - 1) * limit;
+
+  if (offset >= total && total > 0) {
+    // requested page beyond number of items results empty data, keep page
+    return {
+      data: [],
+      page,
+      limit,
+      total,
     };
-
-    this.nextId += 1;
-    this.slots.set(slot.id, slot);
-
-    return { ...slot };
   }
 
-  updateSlot(slotId: number, updates: UpdateSlotInput): Slot {
-    if (!Number.isInteger(slotId) || slotId <= 0) {
-      throw new SlotValidationError("slotId must be a positive integer");
-    }
+  const rawSlots = await repository.getSlotsPage(offset, limit);
+  const data = rawSlots.map(sanitizeSlot);
 
-    if (!updates || typeof updates !== "object") {
-      throw new SlotValidationError("update payload must be an object");
-    }
+  return {
+    data,
+    page,
+    limit,
+    total,
+  };
+};
 
-    if (Object.keys(updates).length === 0) {
-      throw new SlotValidationError("update payload must include at least one field");
-    }
-
-    const existingSlot = this.slots.get(slotId);
-
-    if (!existingSlot) {
-      throw new SlotNotFoundError(`Slot ${slotId} was not found`);
-    }
-
-    const nextProfessional =
-      updates.professional !== undefined
-        ? this.validateProfessional(updates.professional)
-        : existingSlot.professional;
-
-    const nextStartTime = updates.startTime ?? existingSlot.startTime;
-    const nextEndTime = updates.endTime ?? existingSlot.endTime;
-    const validatedRange = this.validateRange(nextStartTime, nextEndTime);
-
-    const updatedSlot: Slot = {
-      ...existingSlot,
-      professional: nextProfessional,
-      startTime: validatedRange.startTime,
-      endTime: validatedRange.endTime,
-      updatedAt: this.now().toISOString(),
-    };
-
-    this.slots.set(slotId, updatedSlot);
-    return { ...updatedSlot };
-  }
-
-  reset(): void {
-    this.slots.clear();
-    this.nextId = 1;
-  }
-
-  private validateProfessional(value: unknown): string {
-    if (typeof value !== "string") {
-      throw new SlotValidationError("professional must be a string");
-    }
-
-    const normalizedValue = value.trim();
-
-    if (!normalizedValue) {
-      throw new SlotValidationError("professional must be a non-empty string");
-    }
-
-    return normalizedValue;
-  }
-
-  private validateRange(startTime: unknown, endTime: unknown): { startTime: number; endTime: number } {
-    if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) {
-      throw new SlotValidationError("startTime and endTime must be finite numbers");
-    }
-
-    const normalizedStartTime = Number(startTime);
-    const normalizedEndTime = Number(endTime);
-
-    if (normalizedEndTime <= normalizedStartTime) {
-      throw new SlotValidationError("endTime must be greater than startTime");
-    }
-
-    return { startTime: normalizedStartTime, endTime: normalizedEndTime };
-  }
-}
-
-export const slotService = new SlotService();
+export const listSlotsWithFailure = async (options: PaginationOptions): Promise<PaginatedSlots> => {
+  // wrapper for simulating DB failures in tests (not used in production)
+  return listSlots(options);
+};
