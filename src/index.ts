@@ -8,7 +8,18 @@ import {
 import { validateRequiredFields } from "./middleware/validation";
 
 import { loadEnvConfig, type EnvConfig } from "./config/env.js";
+import {
+  requireAuthenticatedActor,
+  type AuthenticatedRequest,
+} from "./middleware/auth.js";
 import { validateRequiredFields } from "./middleware/validation.js";
+import {
+  BookingIntentError,
+  BookingIntentService,
+  parseCreateBookingIntentBody,
+} from "./modules/booking-intents/booking-intent-service.js";
+import { InMemoryBookingIntentRepository } from "./modules/booking-intents/booking-intent-repository.js";
+import { InMemorySlotRepository } from "./modules/slots/slot-repository.js";
 
 // Request logging middleware (must be first)
 app.use(createRequestLogger());
@@ -36,13 +47,20 @@ interface AppListener {
   listen(port: number, callback?: () => void): unknown;
 }
 
-export function createApp() {
+export function createApp(options?: {
+  slotRepository?: InMemorySlotRepository;
+  bookingIntentService?: BookingIntentService;
+}) {
   const app = express();
+  const slotRepository = options?.slotRepository ?? new InMemorySlotRepository();
+  const bookingIntentService =
+    options?.bookingIntentService ??
+    new BookingIntentService(new InMemoryBookingIntentRepository(), slotRepository);
 
   app.use(cors());
   app.use(express.json());
 
-  const options = {
+  const swaggerOptions = {
     swaggerDefinition: {
       openapi: "3.0.0",
       info: { title: "ChronoPay API", version: "1.0.0" },
@@ -50,7 +68,7 @@ export function createApp() {
     apis: ["./src/routes/*.ts"], // adjust if needed
   };
 
-  const specs = swaggerJsdoc(options);
+  const specs = swaggerJsdoc(swaggerOptions);
   app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));
 
   app.get("/health", (_req, res) => {
@@ -58,7 +76,7 @@ export function createApp() {
   });
 
   app.get("/api/v1/slots", (_req, res) => {
-    res.json({ slots: [] });
+    res.json({ slots: slotRepository.list() });
   });
 
   app.post(

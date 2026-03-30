@@ -1,11 +1,11 @@
 # chronopay-backend
 
-API backend for **ChronoPay** — time tokenization and scheduling marketplace on Stellar.
+API backend for **ChronoPay** - time tokenization and scheduling marketplace on Stellar.
 
 ## What's in this repo
 
 - **Express** API with TypeScript
-- Health and stub API routes (e.g. `/api/v1/slots`)
+- Health, slot, and booking-intent routes
 - Ready for Stellar Horizon integration, token service, and scheduling logic
 
 ## Prerequisites
@@ -38,7 +38,7 @@ npm run start
 
 ## Environment validation
 
-ChronoPay now validates environment variables centrally at startup through `src/config/env.ts`.
+ChronoPay validates environment variables centrally at startup through `src/config/env.ts`.
 
 Currently validated variables used by `src`:
 
@@ -53,7 +53,7 @@ Currently validated variables used by `src`:
 
 ### Startup failure behavior
 
-If configuration is invalid, the app fails fast before serving requests. Errors are aggregated and sanitized so they identify the variable names and reasons without echoing raw values.
+If configuration is invalid, the app fails fast before serving requests. Errors are aggregated and sanitized so they identify variable names and reasons without echoing raw values.
 
 Example:
 
@@ -76,12 +76,12 @@ Additional reviewer-focused notes live in:
 
 ## Scripts
 
-| Script   | Description                    |
-|----------|--------------------------------|
+| Script | Description |
+|---|---|
 | `npm run build` | Compile TypeScript to `dist/` |
-| `npm run start` | Run production server         |
-| `npm run dev`   | Run dev server with tsx watch  |
-| `npm test`      | Run Jest tests                 |
+| `npm run start` | Run production server |
+| `npm run dev` | Run dev server with tsx watch |
+| `npm test` | Run Jest tests |
 
 ## API (slot listing)
 
