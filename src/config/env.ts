@@ -118,6 +118,11 @@ function parseRedisUrl(rawValue: string | undefined, issues: string[]): string {
       return "redis://localhost:6379";
     }
 
+    if (url.username || url.password) {
+      issues.push("REDIS_URL must not contain embedded credentials.");
+      return "redis://localhost:6379";
+    }
+
     if (/\s/.test(value)) {
       issues.push("REDIS_URL must not contain whitespace.");
       return "redis://localhost:6379";

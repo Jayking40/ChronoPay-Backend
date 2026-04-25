@@ -92,6 +92,20 @@ describe("environment config validation", () => {
     );
   });
 
+  it("rejects REDIS_URL with embedded credentials", () => {
+    expect(() =>
+      loadEnvConfig({
+        NODE_ENV: "production",
+        PORT: "8080",
+        REDIS_URL: "redis://user:pass@localhost:6379",
+      }),
+    ).toThrow(
+      new EnvValidationError([
+        "REDIS_URL must not contain embedded credentials.",
+      ]),
+    );
+  });
+
   it("does not leak raw values in validation errors", () => {
     const badSecretLikeValue = "very-sensitive-looking-value";
 

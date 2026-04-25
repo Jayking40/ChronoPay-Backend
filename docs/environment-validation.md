@@ -33,6 +33,7 @@ Current `src` usage requires these variables:
   - must be a valid URL
   - allowed schemes: `redis`, `rediss`
   - host is required
+  - must not contain embedded credentials
   - whitespace-only values are rejected
 
 Whitespace-only values are rejected rather than treated as valid.
@@ -48,6 +49,12 @@ Invalid environment configuration:
 ```
 
 The message includes variable names and reasons, but never echoes raw values.
+
+## Threat Model Considerations
+
+- **Secret Leakage**: Validation errors never include raw environment variable values to prevent accidental exposure of secrets like API keys or database credentials.
+- **Misconfiguration Masking**: Errors are aggregated and provide specific reasons without revealing internal parsing details that could aid attackers in crafting bypass attempts.
+- **Embedded Credentials**: REDIS_URL validation rejects URLs containing username/password to prevent secrets from being stored in environment variables, reducing the risk of credential exposure through logs or error messages.
 
 ## Security notes
 
